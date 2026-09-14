@@ -35,6 +35,14 @@ The token itself is never stored in the browser and page scripts cannot read the
 That cookie grants **read-only** access. Uploads always require the bearer token, so a cross-site
 page cannot use an operator's cookie to forge a report. `DELETE /api/session` ends the session.
 
+Any non-loopback deployment — anywhere `TCALC_DASHBOARD_HOST` is not `127.0.0.1` — must be served
+over HTTPS, typically behind a trusted reverse proxy that terminates TLS. `HttpOnly` and
+`SameSite=Strict` protect the session cookie from page scripts and cross-site misuse, but they do
+not protect the token or the cookie in transit: over plain HTTP the operator's token and every
+request carrying the cookie travel in cleartext, readable by anyone on the network path. Only TLS
+protects data in transit. The server marks the cookie `Secure` once it sees an HTTPS request,
+directly or through `x-forwarded-proto`.
+
 ### Opting into public reads
 
 Set `TCALC_DASHBOARD_PUBLIC_READ` to `1` (or `true`, `yes`, `on`) only when saved reports are
