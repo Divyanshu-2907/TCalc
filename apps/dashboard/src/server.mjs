@@ -179,8 +179,10 @@ const WWW_AUTHENTICATE = { "www-authenticate": 'Bearer realm="TCalc reports"' };
  * caller proves knowledge of the token or the operator has deliberately opted into public reads.
  */
 function denyRead(request, token, publicRead, sessions) {
-  if (publicRead) return null;
+  // Fail closed first: without a token there is nothing to authenticate against, so reads stay
+  // disabled even when public reads are opted into. Removing the token must never widen access.
   if (!token) return { status: 503, body: { error: "Report access is disabled until TCALC_DASHBOARD_TOKEN is set" } };
+  if (publicRead) return null;
   if (hasBearer(request, token) || hasSession(request, sessions)) return null;
   return { status: 401, body: { error: "Unauthorized" }, headers: WWW_AUTHENTICATE };
 }

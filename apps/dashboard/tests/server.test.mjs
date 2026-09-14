@@ -91,6 +91,22 @@ test("does not leak reports when no token is configured", async () => {
   }
 });
 
+test("keeps reports closed when public read is enabled without a token", async () => {
+  const dataDir = await mkdtemp(path.join(tmpdir(), "tcalc-dashboard-"));
+  const server = createDashboardServer({ dataDir, publicRead: true });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  const url = `http://127.0.0.1:${port}/api/reports`;
+  try {
+    // Opting into public reads must not re-open access once the token is removed.
+    assert.equal((await fetch(url)).status, 503);
+    assert.equal((await fetch(`${url}/anything`)).status, 503);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("exchanges the token for a read-only session cookie", async () => {
   const dataDir = await mkdtemp(path.join(tmpdir(), "tcalc-dashboard-"));
   const server = createDashboardServer({ dataDir, token: "secret" });
