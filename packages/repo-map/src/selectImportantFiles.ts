@@ -93,6 +93,14 @@ function isGeneratedFile(relativePath: string, extension: string): boolean {
   return base.includes(".min.") || base.includes(".bundle.");
 }
 
+/**
+ * The scanner's "generated" risk flag is authoritative; the path heuristic remains a fallback for
+ * scan results produced without it.
+ */
+function isGeneratedEntry(relativePath: string, extension: string, riskFlags: string[]): boolean {
+  return riskFlags.includes("generated") || isGeneratedFile(relativePath, extension);
+}
+
 function dedupeByPath(files: RepoMapFile[]): RepoMapFile[] {
   const seen = new Set<string>();
   return files.filter((file) => {
@@ -187,7 +195,7 @@ export function selectImportantFiles(
       priority,
     };
 
-    if (isGeneratedFile(rp, file.extension)) {
+    if (isGeneratedEntry(rp, file.extension, file.riskFlags)) {
       generatedFiles.push(repoFile);
     }
 
@@ -218,13 +226,20 @@ export function selectImportantFiles(
 
   for (const file of scanResult.files.filter((f) => !f.included)) {
     const rp = file.relativePath.replace(/\\/g, "/");
-    excludedFiles.push({
+    const repoFile: RepoMapFile = {
       relativePath: rp,
       language: getLanguage(file.extension),
       estimatedTokens: file.estimatedTokens,
       reason: file.excludedReason ?? "Excluded by configuration",
       priority: 0,
-    });
+    };
+    excludedFiles.push(repoFile);
+
+    // Scanner exclusion is a token-budget decision. It must not erase the "do not edit this"
+    // guidance, so generated files stay listed here whether or not their tokens are counted.
+    if (isGeneratedEntry(rp, file.extension, file.riskFlags)) {
+      generatedFiles.push(repoFile);
+    }
   }
 
   const allImportant = [...entryPoints, ...configFiles, ...documentationFiles, ...testFiles, ...sourceFiles];
@@ -261,7 +276,7 @@ function getPriority(
   const rp = relativePath.replace(/\\/g, "/");
 
   if (matchPattern(rp, EXCLUDED_PATTERNS)) return 5;
-  if (isGeneratedFile(rp, extension)) return 10;
+  if (isGeneratedEntry(rp, extension, riskFlags)) return 10;
   if (riskFlags.includes("secret")) return 10;
   if (riskFlags.includes("lockfile")) return 15;
   if (riskFlags.includes("database-dump")) return 10;
