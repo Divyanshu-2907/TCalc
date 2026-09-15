@@ -93,6 +93,15 @@ function isGeneratedFile(relativePath: string, extension: string): boolean {
   return base.includes(".min.") || base.includes(".bundle.");
 }
 
+function dedupeByPath(files: RepoMapFile[]): RepoMapFile[] {
+  const seen = new Set<string>();
+  return files.filter((file) => {
+    if (seen.has(file.relativePath)) return false;
+    seen.add(file.relativePath);
+    return true;
+  });
+}
+
 function matchPattern(relativePath: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(relativePath));
 }
@@ -224,7 +233,8 @@ export function selectImportantFiles(
     .filter((f) => f.priority >= 60)
     .slice(0, options.maxFiles ?? 50);
 
-  const recommendedExclude = [...largeFiles, ...generatedFiles, ...excludedFiles, ...riskyFiles]
+  // These lists overlap by design, so collapse to one entry per file before recommending.
+  const recommendedExclude = dedupeByPath([...largeFiles, ...generatedFiles, ...excludedFiles, ...riskyFiles])
     .filter((f) => f.estimatedTokens > 1000);
 
   return {

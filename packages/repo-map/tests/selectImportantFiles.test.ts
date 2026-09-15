@@ -118,6 +118,16 @@ describe("selectImportantFiles", () => {
     expect(selected.configFiles.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("recommends each overlapping file for exclusion only once", () => {
+    const result = makeScanResult([
+      makeFile({ relativePath: "dist/bundle.min.js", extension: ".js", estimatedTokens: 8000, riskFlags: ["generated"] }),
+    ]);
+    const selected = selectImportantFiles(result, { tokenBudget: 8000 });
+
+    const paths = selected.recommendedExclude.map((f) => f.relativePath);
+    expect(paths).toEqual([...new Set(paths)]);
+  });
+
   it("marks excluded files", () => {
     const result = makeScanResult([
       makeFile({ relativePath: "node_modules/foo/index.js", extension: ".js", included: false, excludedReason: "In .gitignore" }),
